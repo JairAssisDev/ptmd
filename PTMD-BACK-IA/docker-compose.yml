@@ -1,0 +1,20 @@
+services:
+  # Python API (IA)
+  python-api:
+    build:
+      context: .
+      dockerfile: Dockerfile
+    container_name: ptmd-python-api-standalone
+    ports:
+      - "8081:8081"
+    volumes:
+      - ./models:/app/models
+    environment:
+      - PYTHONUNBUFFERED=1
+    networks:
+      - ptmd-python-network
+    restart: unless-stopped
+
+networks:
+  ptmd-python-network:
+    driver: bridge

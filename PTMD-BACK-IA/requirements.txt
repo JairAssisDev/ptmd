@@ -1,0 +1,5 @@
+fastapi 
+uvicorn 
+ultralytics
+pydantic
+fastapi[standard]
