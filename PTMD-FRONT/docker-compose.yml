@@ -1,0 +1,21 @@
+services:
+  # Frontend React
+  frontend:
+    build:
+      context: .
+      dockerfile: Dockerfile.standalone
+    container_name: ptmd-frontend-app
+    ports:
+      - "3000:80"
+    environment:
+      - VITE_API_URL=http://127.0.0.1:8080/api
+    extra_hosts:
+      - "host.docker.internal:host-gateway"
+    networks:
+      - ptmd-frontend-network
+    restart: unless-stopped
+
+networks:
+  ptmd-frontend-network:
+    driver: bridge
+

@@ -1,0 +1,16 @@
+target/
+.mvn/
+mvnw
+mvnw.cmd
+.idea/
+.vscode/
+*.iml
+.git/
+.gitignore
+README.md
+RELATORIO_IMPLEMENTACAO.md
+README-DOCKER.md
+uploads/
+*.log
+.DS_Store
+

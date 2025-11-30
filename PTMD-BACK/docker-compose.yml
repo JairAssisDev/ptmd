@@ -1,0 +1,58 @@
+services:
+  # MySQL Database
+  mysql:
+    image: mysql:8.0
+    container_name: ptmd-mysql
+    environment:
+      MYSQL_ROOT_PASSWORD: root_password
+      MYSQL_DATABASE: ptmd_db
+      MYSQL_USER: ptmd_user
+      MYSQL_PASSWORD: ptmd_password
+    ports:
+      - "3306:3306"
+    volumes:
+      - mysql_data:/var/lib/mysql
+      - ./init.sql:/docker-entrypoint-initdb.d/init.sql:ro
+    healthcheck:
+      test: ["CMD", "mysqladmin", "ping", "-h", "localhost", "-u", "root", "-proot_password"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+      start_period: 30s
+    networks:
+      - ptmd-network
+    restart: unless-stopped
+
+  # Java Backend API
+  java-backend:
+    build:
+      context: .
+      dockerfile: Dockerfile
+    container_name: ptmd-backend
+    ports:
+      - "8080:8080"
+    volumes:
+      - ./uploads:/app/uploads
+    environment:
+      - SPRING_PROFILES_ACTIVE=docker
+      - SPRING_DATASOURCE_URL=jdbc:mysql://mysql:3306/ptmd_db?createDatabaseIfNotExist=true&useSSL=false&serverTimezone=UTC&allowPublicKeyRetrieval=true
+      - SPRING_DATASOURCE_USERNAME=ptmd_user
+      - SPRING_DATASOURCE_PASSWORD=ptmd_password
+      - APP_AI_SERVICE_URL=http://localhost:8081
+    extra_hosts:
+      - "host.docker.internal:host-gateway"
+    networks:
+      - ptmd-network
+    restart: unless-stopped
+    depends_on:
+      mysql:
+        condition: service_healthy
+
+volumes:
+  mysql_data:
+    driver: local
+
+networks:
+  ptmd-network:
+    driver: bridge
+
