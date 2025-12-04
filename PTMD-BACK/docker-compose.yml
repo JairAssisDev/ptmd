@@ -33,12 +33,6 @@ services:
       - "8080:8080"
     volumes:
       - ./uploads:/app/uploads
-    environment:
-      - SPRING_PROFILES_ACTIVE=docker
-      - SPRING_DATASOURCE_URL=jdbc:mysql://mysql:3306/ptmd_db?createDatabaseIfNotExist=true&useSSL=false&serverTimezone=UTC&allowPublicKeyRetrieval=true
-      - SPRING_DATASOURCE_USERNAME=ptmd_user
-      - SPRING_DATASOURCE_PASSWORD=ptmd_password
-      - APP_AI_SERVICE_URL=http://localhost:8081
     extra_hosts:
       - "host.docker.internal:host-gateway"
     networks:

@@ -56,10 +56,11 @@ public class AdminController {
         }
     }
 
-    @Operation(summary = "Download backup", description = "Gera e retorna um arquivo ZIP contendo todas as imagens armazenadas no servidor")
+    @Operation(summary = "Download database", description = "Gera e retorna um arquivo ZIP contendo imagens de consultas confirmadas, renomeadas com ID da imagem, ID do paciente e diagnóstico da IA")
     @ApiResponses(value = {
             @ApiResponse(responseCode = "200", description = "Arquivo ZIP gerado com sucesso",
                     content = @Content(mediaType = "application/zip")),
+            @ApiResponse(responseCode = "400", description = "Nenhuma imagem com diagnóstico confirmado encontrada"),
             @ApiResponse(responseCode = "500", description = "Erro ao gerar backup")
     })
     @GetMapping("/backup")
@@ -69,14 +70,16 @@ public class AdminController {
 
             HttpHeaders headers = new HttpHeaders();
             headers.setContentType(MediaType.APPLICATION_OCTET_STREAM);
-            headers.setContentDispositionFormData("attachment", "ptmd_backup.zip");
+            headers.setContentDispositionFormData("attachment", "ptmd_database.zip");
             headers.setContentLength(zipBytes.length);
 
             return new ResponseEntity<>(zipBytes, headers, HttpStatus.OK);
         } catch (IOException e) {
             return ResponseEntity.status(HttpStatus.INTERNAL_SERVER_ERROR).build();
         } catch (RuntimeException e) {
-            return ResponseEntity.badRequest().build();
+            return ResponseEntity.badRequest()
+                    .header("X-Error-Message", e.getMessage())
+                    .build();
         }
     }
 }

@@ -19,9 +19,11 @@ import java.io.File;
 import java.io.FileInputStream;
 import java.io.FileOutputStream;
 import java.io.IOException;
+import java.io.PrintWriter;
 import java.nio.file.Files;
 import java.nio.file.Path;
 import java.nio.file.Paths;
+import java.util.List;
 import java.util.zip.ZipEntry;
 import java.util.zip.ZipOutputStream;
 
@@ -70,29 +72,85 @@ public class AdminService {
     }
 
     public byte[] generateBackup() throws IOException {
-        Path uploadPath = Paths.get(uploadDir);
+        // Buscar apenas imagens de consultas confirmadas pelo médico
+        List<com.ptmd.entity.Image> confirmedImages = imageRepository.findConfirmedImagesWithDiagnosis();
         
-        if (!Files.exists(uploadPath)) {
-            throw new RuntimeException("Diretório de uploads não existe");
+        if (confirmedImages.isEmpty()) {
+            throw new RuntimeException("Nenhuma imagem com diagnóstico confirmado pelo médico encontrada");
         }
 
-        File tempZip = File.createTempFile("ptmd_backup_", ".zip");
+        File tempZip = File.createTempFile("ptmd_database_", ".zip");
+        File tempCsv = File.createTempFile("ptmd_database_", ".csv");
         
         try (FileOutputStream fos = new FileOutputStream(tempZip);
-             ZipOutputStream zos = new ZipOutputStream(fos)) {
+             ZipOutputStream zos = new ZipOutputStream(fos);
+             PrintWriter csvWriter = new PrintWriter(new FileOutputStream(tempCsv))) {
+            
+            // Escrever cabeçalho do CSV
+            csvWriter.println("Image ID,Patient ID,Model Prediction,Doctor Final Diagnosis");
+            
+            // Processar cada imagem confirmada
+            for (com.ptmd.entity.Image image : confirmedImages) {
+                // Verificar se o arquivo existe
+                Path imagePath = Paths.get(image.getFilePath());
+                if (!Files.exists(imagePath)) {
+                    continue; // Pular se o arquivo não existir
+                }
 
-            File uploadDirFile = uploadPath.toFile();
-            File[] files = uploadDirFile.listFiles();
-
-            if (files != null) {
-                for (File file : files) {
-                    if (file.isFile()) {
-                        addFileToZip(file, zos);
+                // Obter informações da consulta e paciente
+                Long imageId = image.getId();
+                Long patientId = image.getConsultation().getPatient().getId();
+                String aiDiagnosis = image.getConsultation().getAiDiagnosis();
+                String finalDiagnosis = image.getConsultation().getFinalDiagnosis();
+                
+                // Escrever linha no CSV
+                csvWriter.printf("%d,%d,%s,%s%n", 
+                    imageId, 
+                    patientId, 
+                    aiDiagnosis != null ? aiDiagnosis : "", 
+                    finalDiagnosis != null ? finalDiagnosis : "");
+                
+                // Limpar o diagnóstico para usar como nome de arquivo (remover caracteres inválidos)
+                String safeDiagnosis = sanitizeFileName(finalDiagnosis != null ? finalDiagnosis : "Unknown");
+                
+                // Obter extensão do arquivo original
+                String originalFileName = image.getFileName();
+                String extension = "";
+                if (originalFileName != null && originalFileName.contains(".")) {
+                    extension = originalFileName.substring(originalFileName.lastIndexOf("."));
+                } else {
+                    // Tentar obter extensão do contentType
+                    if (image.getContentType() != null) {
+                        if (image.getContentType().contains("jpeg") || image.getContentType().contains("jpg")) {
+                            extension = ".jpg";
+                        } else if (image.getContentType().contains("png")) {
+                            extension = ".png";
+                        } else {
+                            extension = ".jpg"; // Default
+                        }
+                    } else {
+                        extension = ".jpg"; // Default
                     }
                 }
+                
+                // Criar nome do arquivo: {imageId}_{patientId}_{finalDiagnosis}.{ext}
+                String newFileName = String.format("%d_%d_%s%s", imageId, patientId, safeDiagnosis, extension);
+                
+                // Adicionar arquivo ao ZIP com o novo nome
+                addFileToZip(imagePath.toFile(), newFileName, zos);
             }
+            
+            csvWriter.flush();
+            
+            // Adicionar CSV ao ZIP
+            addFileToZip(tempCsv, "database.csv", zos);
 
             zos.finish();
+        } finally {
+            // Limpar arquivo temporário CSV
+            if (tempCsv.exists()) {
+                tempCsv.delete();
+            }
         }
 
         byte[] zipBytes = Files.readAllBytes(tempZip.toPath());
@@ -101,9 +159,14 @@ public class AdminService {
         return zipBytes;
     }
 
-    private void addFileToZip(File file, ZipOutputStream zos) throws IOException {
+    private String sanitizeFileName(String fileName) {
+        // Remover caracteres inválidos para nome de arquivo
+        return fileName.replaceAll("[^a-zA-Z0-9._-]", "_");
+    }
+
+    private void addFileToZip(File file, String zipEntryName, ZipOutputStream zos) throws IOException {
         try (FileInputStream fis = new FileInputStream(file)) {
-            ZipEntry zipEntry = new ZipEntry(file.getName());
+            ZipEntry zipEntry = new ZipEntry(zipEntryName);
             zos.putNextEntry(zipEntry);
 
             byte[] bytes = new byte[1024];

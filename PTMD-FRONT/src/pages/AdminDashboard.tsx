@@ -54,13 +54,16 @@ const AdminDashboard = () => {
       const url = window.URL.createObjectURL(blob)
       const a = document.createElement('a')
       a.href = url
-      a.download = `ptmd_backup_${new Date().toISOString().split('T')[0]}.zip`
+      a.download = `ptmd_database_${new Date().toISOString().split('T')[0]}.zip`
       document.body.appendChild(a)
       a.click()
       window.URL.revokeObjectURL(url)
       document.body.removeChild(a)
     } catch (err: any) {
-      setError('Erro ao gerar backup')
+      const errorMessage = err.response?.headers?.['x-error-message'] || 
+                          err.response?.data?.error || 
+                          'Erro ao gerar database'
+      setError(errorMessage)
     }
   }
 
@@ -150,7 +153,7 @@ const AdminDashboard = () => {
           onClick={handleDownloadBackup}
           sx={{ mr: 2 }}
         >
-          Download Backup de Imagens
+          Download Database
         </Button>
         <Button
           variant="outlined"

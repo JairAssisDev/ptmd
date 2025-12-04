@@ -1,4 +1,5 @@
 import api from './api'
+import { Diagnosis } from '../types/diagnosis'
 
 export interface PatientRequest {
   nome: string
@@ -29,8 +30,10 @@ export interface ConsultationResponse {
 }
 
 export interface ConfirmDiagnosisRequest {
-  finalDiagnosis: string
+  finalDiagnosis: Diagnosis
 }
+
+export type { Diagnosis }
 
 export const consultationService = {
   createConsultation: async (data: ConsultationRequest): Promise<ConsultationResponse> => {

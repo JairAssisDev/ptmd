@@ -18,6 +18,10 @@ import {
   TableRow,
   Paper,
   Chip,
+  MenuItem,
+  Select,
+  FormControl,
+  InputLabel,
 } from '@mui/material'
 import {
   Add as AddIcon,
@@ -32,6 +36,7 @@ import {
   ConsultationRequest,
   ConfirmDiagnosisRequest,
 } from '../services/consultationService'
+import { Diagnosis, DiagnosisOptions } from '../types/diagnosis'
 
 const MedicoDashboard = () => {
   const [consultations, setConsultations] = useState<ConsultationResponse[]>([])
@@ -45,7 +50,7 @@ const MedicoDashboard = () => {
     patientDataNascimento: '',
     image: null as File | null,
   })
-  const [confirmDiagnosis, setConfirmDiagnosis] = useState('')
+  const [confirmDiagnosis, setConfirmDiagnosis] = useState<Diagnosis>(Diagnosis.NORMAL)
   const [uploading, setUploading] = useState(false)
 
   useEffect(() => {
@@ -110,7 +115,22 @@ const MedicoDashboard = () => {
 
   const handleOpenConfirmDialog = (consultation: ConsultationResponse) => {
     setSelectedConsultation(consultation)
-    setConfirmDiagnosis(consultation.aiDiagnosis || '')
+    // Tenta mapear o diagnóstico da IA para o enum, prioriza multClass se disponível
+    const aiDiagnosis = consultation.multClass || consultation.aiDiagnosis || ''
+    // Mapeia valores possíveis para o enum
+    let mappedDiagnosis: Diagnosis = Diagnosis.NORMAL // Default
+    if (aiDiagnosis) {
+      const normalized = aiDiagnosis.toLowerCase().trim()
+      if (normalized === 'normal') mappedDiagnosis = Diagnosis.NORMAL
+      else if (normalized === 'aom') mappedDiagnosis = Diagnosis.AOM
+      else if (normalized === 'csom') mappedDiagnosis = Diagnosis.CSOM
+      else if (normalized === 'earwax') mappedDiagnosis = Diagnosis.EARWAX
+      else if (normalized === 'externalearinfections' || normalized === 'external ear infections') {
+        mappedDiagnosis = Diagnosis.EXTERNAL_EAR_INFECTIONS
+      }
+      else if (normalized === 'tympanoskleros') mappedDiagnosis = Diagnosis.TYMPANOSKLEROS
+    }
+    setConfirmDiagnosis(mappedDiagnosis)
     setConfirmDialogOpen(true)
   }
 
@@ -132,7 +152,7 @@ const MedicoDashboard = () => {
       )
       setConfirmDialogOpen(false)
       setSelectedConsultation(null)
-      setConfirmDiagnosis('')
+      setConfirmDiagnosis(Diagnosis.NORMAL)
     } catch (err: any) {
       setError(err.response?.data?.error || 'Erro ao confirmar diagnóstico')
     }
@@ -327,15 +347,22 @@ const MedicoDashboard = () => {
                   ? `${(selectedConsultation.confidence * 100).toFixed(1)}%`
                   : 'N/A'}
               </Alert>
-              <TextField
-                fullWidth
-                label="Diagnóstico Final"
-                multiline
-                rows={4}
-                value={confirmDiagnosis}
-                onChange={(e) => setConfirmDiagnosis(e.target.value)}
-                placeholder="Você pode aceitar o diagnóstico da IA ou escrever outro"
-              />
+              <FormControl fullWidth sx={{ mt: 2 }}>
+                <InputLabel id="diagnosis-select-label">Diagnóstico Final</InputLabel>
+                <Select
+                  labelId="diagnosis-select-label"
+                  id="diagnosis-select"
+                  value={confirmDiagnosis}
+                  label="Diagnóstico Final"
+                  onChange={(e) => setConfirmDiagnosis(e.target.value as Diagnosis)}
+                >
+                  {DiagnosisOptions.map((option) => (
+                    <MenuItem key={option.value} value={option.value}>
+                      {option.label}
+                    </MenuItem>
+                  ))}
+                </Select>
+              </FormControl>
             </Box>
           )}
         </DialogContent>

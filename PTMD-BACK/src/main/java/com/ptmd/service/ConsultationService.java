@@ -102,7 +102,11 @@ public class ConsultationService {
             throw new RuntimeException("Você não tem permissão para confirmar esta consulta");
         }
 
-        consultation.setFinalDiagnosis(request.getFinalDiagnosis());
+        if (request.getFinalDiagnosis() == null) {
+            throw new RuntimeException("Diagnóstico final é obrigatório");
+        }
+
+        consultation.setFinalDiagnosis(request.getFinalDiagnosis().getValue());
         consultation.setConfirmed(true);
         consultation = consultationRepository.save(consultation);
 

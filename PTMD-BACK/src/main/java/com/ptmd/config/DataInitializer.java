@@ -8,8 +8,6 @@ import org.springframework.boot.CommandLineRunner;
 import org.springframework.security.crypto.password.PasswordEncoder;
 import org.springframework.stereotype.Component;
 
-import java.time.LocalDate;
-
 @Component
 public class DataInitializer implements CommandLineRunner {
 
@@ -19,12 +17,17 @@ public class DataInitializer implements CommandLineRunner {
     @Autowired
     private PasswordEncoder passwordEncoder;
 
-    @Value("${app.admin.default.username:admin}")
-    private String adminUsername;
+    // Admin Mock Config
+    @Value("${app.admin.default.email:admin}")
+    private String adminEmail;
 
     @Value("${app.admin.default.password:admin}")
     private String adminPassword;
 
+    @Value("${app.admin.default.nome:Administrador}")
+    private String adminNome;
+
+    // Médico Mock Config
     @Value("${app.medico.default.email:medico@example.com}")
     private String medicoEmail;
 
@@ -42,48 +45,58 @@ public class DataInitializer implements CommandLineRunner {
 
     @Override
     public void run(String... args) {
-        System.out.println("========================================");
+
+        System.out.println("\n========================================");
         System.out.println("  Inicializando dados do sistema...");
         System.out.println("========================================");
 
-        // Criar Administrador
-        if (!userRepository.existsByEmail(adminUsername)) {
-            User admin = new User();
-            admin.setEmail(adminUsername);
-            admin.setPassword(passwordEncoder.encode(adminPassword));
-            admin.setNome("Administrador Principal");
-            admin.setRole(User.Role.ADMIN);
-            userRepository.save(admin);
-            System.out.println("✓ Usuário ADMIN criado com sucesso!");
-            System.out.println("  Email: " + adminUsername);
-            System.out.println("  Senha: " + adminPassword);
-        } else {
-            System.out.println("ℹ Usuário ADMIN já existe: " + adminUsername);
-        }
+        criarAdminMock();
+        criarMedicoMock();
 
-        // Criar Médico Mock
+        System.out.println("========================================");
+        System.out.println("  Inicialização concluída!");
+        System.out.println("========================================\n");
+    }
+
+    private void criarAdminMock() {
+        if (!userRepository.existsByEmail(adminEmail)) {
+
+            User admin = new User();
+            admin.setEmail(adminEmail);
+            admin.setPassword(passwordEncoder.encode(adminPassword));
+            admin.setNome(adminNome);
+            admin.setRole(User.Role.ADMIN);
+
+            userRepository.save(admin);
+
+            System.out.println("✓ ADMIN criado com sucesso!");
+            System.out.println("  Email: " + adminEmail);
+            System.out.println("  Senha: " + adminPassword);
+
+        } else {
+            System.out.println("ℹ ADMIN já existe: " + adminEmail);
+        }
+    }
+
+    private void criarMedicoMock() {
         if (!userRepository.existsByEmail(medicoEmail)) {
+
             User medico = new User();
             medico.setEmail(medicoEmail);
             medico.setPassword(passwordEncoder.encode(medicoPassword));
             medico.setNome(medicoNome);
             medico.setCpf(medicoCpf);
             medico.setCrm(medicoCrm);
-            medico.setDataNascimento(LocalDate.of(1980, 5, 15));
             medico.setRole(User.Role.MEDICO);
+
             userRepository.save(medico);
-            System.out.println("✓ Usuário MÉDICO criado com sucesso!");
+
+            System.out.println("✓ MÉDICO criado com sucesso!");
             System.out.println("  Email: " + medicoEmail);
             System.out.println("  Senha: " + medicoPassword);
-            System.out.println("  Nome: " + medicoNome);
-            System.out.println("  CRM: " + medicoCrm);
-        } else {
-            System.out.println("ℹ Usuário MÉDICO já existe: " + medicoEmail);
-        }
 
-        System.out.println("========================================");
-        System.out.println("  Inicialização concluída!");
-        System.out.println("========================================");
+        } else {
+            System.out.println("ℹ MÉDICO já existe: " + medicoEmail);
+        }
     }
 }
-
