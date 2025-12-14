@@ -64,7 +64,7 @@ public class AdminController {
             @ApiResponse(responseCode = "500", description = "Erro ao gerar backup")
     })
     @GetMapping("/backup")
-    public ResponseEntity<byte[]> downloadBackup() {
+    public ResponseEntity<?> downloadBackup() {
         try {
             byte[] zipBytes = adminService.generateBackup();
 
@@ -75,11 +75,11 @@ public class AdminController {
 
             return new ResponseEntity<>(zipBytes, headers, HttpStatus.OK);
         } catch (IOException e) {
-            return ResponseEntity.status(HttpStatus.INTERNAL_SERVER_ERROR).build();
+            return ResponseEntity.status(HttpStatus.INTERNAL_SERVER_ERROR)
+                    .body("Erro ao gerar backup: " + e.getMessage());
         } catch (RuntimeException e) {
             return ResponseEntity.badRequest()
-                    .header("X-Error-Message", e.getMessage())
-                    .build();
+                    .body("{\"error\":\"" + e.getMessage() + "\"}");
         }
     }
 }

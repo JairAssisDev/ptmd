@@ -3,25 +3,24 @@ import { Diagnosis } from '../types/diagnosis'
 
 export interface PatientRequest {
   nome: string
+  cpf: string
   sexo: 'MASCULINO' | 'FEMININO' | 'OUTRO'
   dataNascimento?: string
 }
 
 export interface ConsultationRequest {
   patient: PatientRequest
-  image: File
+  images: File[]
 }
 
-export interface ConsultationResponse {
+export interface ImageResponse {
   id: number
-  patient: {
-    id: number
-    nome: string
-    sexo: string
-    dataNascimento?: string
-  }
-  aiDiagnosis: string
-  confidence: number
+  fileName: string
+  filePath: string
+  fileSize: number
+  contentType: string
+  aiDiagnosis?: string
+  confidence?: number
   multClass?: string
   multClassConfidence?: number
   finalDiagnosis?: string
@@ -29,21 +28,47 @@ export interface ConsultationResponse {
   createdAt: string
 }
 
+export interface ConsultationResponse {
+  id: number
+  patient: {
+    id: number
+    nome: string
+    cpf: string
+    sexo: string
+    dataNascimento?: string
+  }
+  aiDiagnosis?: string
+  confidence?: number
+  multClass?: string
+  multClassConfidence?: number
+  finalDiagnosis?: string
+  confirmed: boolean
+  images: ImageResponse[]
+  createdAt: string
+}
+
 export interface ConfirmDiagnosisRequest {
   finalDiagnosis: Diagnosis
 }
 
-export type { Diagnosis }
+export interface ConfirmImageDiagnosisRequest {
+  finalDiagnosis: Diagnosis
+}
 
 export const consultationService = {
   createConsultation: async (data: ConsultationRequest): Promise<ConsultationResponse> => {
     const formData = new FormData()
     formData.append('patient.nome', data.patient.nome)
+    formData.append('patient.cpf', data.patient.cpf)
     formData.append('patient.sexo', data.patient.sexo)
     if (data.patient.dataNascimento) {
       formData.append('patient.dataNascimento', data.patient.dataNascimento)
     }
-    formData.append('image', data.image)
+    
+    // Adicionar todas as imagens com o mesmo nome para o Spring reconhecer como lista
+    data.images.forEach((image) => {
+      formData.append('images', image)
+    })
 
     const response = await api.post<ConsultationResponse>('/medico/consultations', formData, {
       headers: {
@@ -64,9 +89,29 @@ export const consultationService = {
     return response.data
   },
 
-  getMyConsultations: async (): Promise<ConsultationResponse[]> => {
-    const response = await api.get<ConsultationResponse[]>('/medico/consultations')
+  confirmImageDiagnosis: async (
+    imageId: number,
+    data: ConfirmImageDiagnosisRequest
+  ): Promise<ImageResponse> => {
+    const response = await api.put<ImageResponse>(
+      `/medico/consultations/images/${imageId}/confirm`,
+      data
+    )
+    return response.data
+  },
+
+  getMyConsultations: async (nome?: string, cpf?: string): Promise<ConsultationResponse[]> => {
+    const params = new URLSearchParams()
+    if (nome) params.append('nome', nome)
+    if (cpf) params.append('cpf', cpf)
+    
+    const url = `/medico/consultations${params.toString() ? '?' + params.toString() : ''}`
+    const response = await api.get<ConsultationResponse[]>(url)
+    return response.data
+  },
+
+  getConsultationById: async (consultationId: number): Promise<ConsultationResponse> => {
+    const response = await api.get<ConsultationResponse>(`/medico/consultations/${consultationId}`)
     return response.data
   },
 }
-

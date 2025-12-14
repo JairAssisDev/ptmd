@@ -12,6 +12,7 @@ import java.time.LocalDate;
 public class PatientResponse {
     private Long id;
     private String nome;
+    private String cpf;
     private String sexo;
     private LocalDate dataNascimento;
 }

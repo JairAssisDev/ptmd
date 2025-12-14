@@ -34,6 +34,24 @@ public class Image {
     @Column(name = "content_type")
     private String contentType;
 
+    @Column(name = "ai_diagnosis")
+    private String aiDiagnosis;
+
+    @Column(name = "confidence")
+    private Double confidence;
+
+    @Column(name = "mult_class")
+    private String multClass;
+
+    @Column(name = "mult_class_confidence")
+    private Double multClassConfidence;
+
+    @Column(name = "final_diagnosis")
+    private String finalDiagnosis;
+
+    @Column(name = "confirmed")
+    private Boolean confirmed = false;
+
     @Column(name = "created_at")
     private LocalDateTime createdAt;
 

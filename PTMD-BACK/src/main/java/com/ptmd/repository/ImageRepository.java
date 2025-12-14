@@ -10,7 +10,7 @@ import java.util.List;
 @Repository
 public interface ImageRepository extends JpaRepository<Image, Long> {
     
-    @Query("SELECT i FROM Image i JOIN FETCH i.consultation c JOIN FETCH c.patient WHERE c.confirmed = true AND c.aiDiagnosis IS NOT NULL AND c.finalDiagnosis IS NOT NULL")
+    @Query("SELECT i FROM Image i JOIN FETCH i.consultation c JOIN FETCH c.patient WHERE i.confirmed = true AND i.aiDiagnosis IS NOT NULL AND i.finalDiagnosis IS NOT NULL")
     List<Image> findConfirmedImagesWithDiagnosis();
 }
 

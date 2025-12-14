@@ -23,6 +23,9 @@ public class Patient {
     @Column(nullable = false)
     private String nome;
 
+    @Column(unique = true)
+    private String cpf;
+
     @Enumerated(EnumType.STRING)
     @Column(nullable = false)
     private Sexo sexo;

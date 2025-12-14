@@ -1,0 +1,737 @@
+================================================================================
+                    RELATÓRIO COMPLETO DO PROJETO PTMD
+                    Sistema de Diagnóstico Médico com IA
+================================================================================
+
+Data de Geração: 2025-12-06
+Versão: 1.0
+
+Repositório GitHub: https://github.com/JairAssisDev/ptmd.git
+Autor: JairAssisDev
+
+================================================================================
+1. VISÃO GERAL DO PROJETO
+================================================================================
+
+O PTMD (Projeto de Tecnologia Médica para Diagnóstico) é um sistema completo
+de diagnóstico médico assistido por Inteligência Artificial, desenvolvido para
+auxiliar médicos no diagnóstico de condições relacionadas ao ouvido.
+
+O sistema permite que médicos:
+- Cadastrem pacientes e realizem consultas
+- Enviem imagens de exames para análise por IA
+- Recebam diagnósticos preliminares da IA
+- Confirmem ou ajustem diagnósticos individualmente por imagem
+- Gerenciem histórico de consultas e pacientes
+- Administradores possam gerar backups do banco de dados
+
+================================================================================
+2. ARQUITETURA E TECNOLOGIAS
+================================================================================
+
+2.1. BACKEND (PTMD-BACK)
+-------------------------
+- Linguagem: Java 17+
+- Framework: Spring Boot 3.2.0
+- Banco de Dados: MySQL 8.0+
+- ORM: JPA/Hibernate
+- Segurança: Spring Security com JWT
+- Integração: Spring WebClient (reactive)
+- Documentação: SpringDoc OpenAPI (Swagger)
+- Build: Maven
+
+2.2. FRONTEND (PTMD-FRONT)
+---------------------------
+- Linguagem: TypeScript
+- Framework: React
+- UI: Material-UI (MUI)
+- Roteamento: React Router
+- HTTP Client: Axios
+- Build: Vite
+
+2.3. MICROSSERVIÇO DE IA (Python)
+-----------------------------------
+- Endpoint: http://localhost:8081/predict
+- Protocolo: HTTP REST
+- Formato: Multipart/form-data
+- Retorna: Diagnóstico com probabilidades
+
+2.4. INFRAESTRUTURA
+--------------------
+- Docker Compose para orquestração
+- Containers: Java Backend, MySQL, Python API, Frontend
+- Portas:
+  * Backend: 8080
+  * Frontend: 3000
+  * MySQL: 3306
+  * Python API: 8081
+
+================================================================================
+3. ESTRUTURA DE DADOS
+================================================================================
+
+3.1. ENTIDADE: User (Usuário)
+-------------------------------
+Campos:
+- id: Long (PK, auto-incremento)
+- nome: String (obrigatório)
+- email: String (obrigatório, único)
+- password: String (hash BCrypt)
+- cpf: String (opcional, para médicos)
+- crm: String (opcional, para médicos)
+- dataNascimento: LocalDate (opcional)
+- role: Enum (ADMIN ou MEDICO)
+- createdAt: LocalDateTime
+
+Regras:
+- Email deve ser único no sistema
+- Senha é armazenada com hash BCrypt
+- Role determina permissões de acesso
+- ADMIN tem acesso total ao sistema
+- MEDICO tem acesso apenas a suas consultas
+
+3.2. ENTIDADE: Patient (Paciente)
+-----------------------------------
+Campos:
+- id: Long (PK, auto-incremento)
+- nome: String (obrigatório)
+- cpf: String (obrigatório, único)
+- sexo: Enum (MASCULINO, FEMININO, OUTRO)
+- dataNascimento: LocalDate (opcional)
+- createdAt: LocalDateTime
+
+Regras:
+- CPF deve ser único no sistema
+- Sistema busca paciente existente por CPF ao criar consulta
+- Se paciente não existe, cria novo registro
+- Se paciente existe, atualiza dados se necessário
+
+3.3. ENTIDADE: Consultation (Consulta)
+----------------------------------------
+Campos:
+- id: Long (PK, auto-incremento)
+- patient: Patient (ManyToOne, obrigatório)
+- medico: User (ManyToOne, obrigatório)
+- images: List<Image> (OneToMany)
+- aiDiagnosis: String (diagnóstico da IA - primeira imagem)
+- confidence: Double (confiança da IA - primeira imagem)
+- multClass: String (classe multiclasse - primeira imagem)
+- multClassConfidence: Double (confiança multiclasse - primeira imagem)
+- finalDiagnosis: String (diagnóstico final da consulta - legado)
+- confirmed: Boolean (se consulta foi confirmada - legado)
+- createdAt: LocalDateTime
+
+Regras:
+- Uma consulta pode ter múltiplas imagens
+- Diagnóstico da consulta é baseado na primeira imagem processada
+- Campos finalDiagnosis e confirmed na consulta são legados
+- Confirmação real é feita por imagem individual
+
+3.4. ENTIDADE: Image (Imagem)
+-------------------------------
+Campos:
+- id: Long (PK, auto-incremento)
+- consultation: Consultation (ManyToOne, obrigatório)
+- filePath: String (caminho completo no disco)
+- fileName: String (nome original do arquivo)
+- fileSize: Long (tamanho em bytes)
+- contentType: String (tipo MIME)
+- aiDiagnosis: String (diagnóstico da IA para esta imagem)
+- confidence: Double (confiança da IA)
+- multClass: String (classe multiclasse se anormal)
+- multClassConfidence: Double (confiança multiclasse)
+- finalDiagnosis: String (diagnóstico final confirmado pelo médico)
+- confirmed: Boolean (se diagnóstico foi confirmado)
+- createdAt: LocalDateTime
+
+Regras:
+- Cada imagem é analisada individualmente pela IA
+- Cada imagem pode ter seu diagnóstico confirmado separadamente
+- finalDiagnosis deve ser um valor do enum Diagnosis
+- confirmed = true quando médico confirma o diagnóstico
+
+================================================================================
+4. ENUMS E VALORES PERMITIDOS
+================================================================================
+
+4.1. User.Role
+--------------
+- ADMIN: Administrador do sistema
+- MEDICO: Médico usuário
+
+4.2. Patient.Sexo
+------------------
+- MASCULINO
+- FEMININO
+- OUTRO
+
+4.3. Diagnosis (Diagnóstico)
+-----------------------------
+Valores permitidos:
+- Normal
+- aom (Otite Média Aguda)
+- csom (Otite Média Crônica)
+- earwax (Cerúmen)
+- ExternalEarInfections (Infecções do Ouvido Externo)
+- tympanoskleros (Timpanoesclerose)
+
+Regras:
+- Valores são case-insensitive na conversão
+- Aceita tanto o valor quanto o nome do enum
+- Validação ocorre no backend e frontend
+
+================================================================================
+5. FUNCIONALIDADES POR MÓDULO
+================================================================================
+
+5.1. MÓDULO DE AUTENTICAÇÃO
+----------------------------
+Endpoints:
+- POST /api/auth/register - Cadastro público de médico
+- POST /api/auth/login - Login e obtenção de token JWT
+
+Funcionalidades:
+- Cadastro público de médicos (não requer autenticação)
+- Login com email e senha
+- Geração de token JWT válido por 24 horas
+- Validação automática de token em todas as requisições protegidas
+- Hash de senhas com BCrypt
+
+Regras:
+- Email deve ser único
+- Senha deve ter no mínimo 6 caracteres (validação frontend)
+- Token JWT expira em 86400000ms (24 horas)
+- Token é enviado no header: Authorization: Bearer {token}
+
+5.2. MÓDULO DE CONSULTAS MÉDICAS
+---------------------------------
+Endpoints:
+- POST /api/medico/consultations - Criar nova consulta
+- GET /api/medico/consultations - Listar consultas do médico
+- GET /api/medico/consultations/{id} - Obter detalhes da consulta
+- PUT /api/medico/consultations/{id}/confirm - Confirmar diagnóstico (legado)
+- PUT /api/medico/consultations/images/{imageId}/confirm - Confirmar diagnóstico por imagem
+
+Funcionalidades:
+- Criar consulta com paciente e múltiplas imagens
+- Upload de até 10 imagens por consulta
+- Análise automática de cada imagem pela IA
+- Armazenamento de diagnóstico da IA por imagem
+- Listagem de consultas com filtros (nome e CPF do paciente)
+- Visualização detalhada de consulta com todas as imagens
+- Confirmação de diagnóstico individual por imagem
+- Busca de paciente existente por CPF
+
+Regras:
+- Médico só pode ver suas próprias consultas
+- ADMIN pode ver todas as consultas
+- Pelo menos uma imagem é obrigatória
+- CPF do paciente é obrigatório
+- Nome do paciente é obrigatório
+- Cada imagem é processada individualmente pela IA
+- Diagnóstico da consulta é baseado na primeira imagem
+- Confirmação de diagnóstico é feita por imagem
+
+5.3. MÓDULO ADMINISTRATIVO
+---------------------------
+Endpoints:
+- GET /api/admin/dashboard - Estatísticas do sistema
+- POST /api/admin/change-password - Alterar senha própria
+- GET /api/admin/backup - Download do banco de dados
+
+Funcionalidades:
+- Dashboard com estatísticas:
+  * Total de imagens
+  * Total de consultas
+  * Total de pacientes
+- Alteração de senha do próprio administrador
+- Geração de backup em ZIP contendo:
+  * Todas as imagens confirmadas (pasta dataset/)
+  * Arquivo CSV com metadados
+
+Regras:
+- Apenas usuários com role ADMIN podem acessar
+- Backup inclui apenas imagens com diagnóstico confirmado
+- Imagens no backup são renomeadas: {imageId}_{patientId}_{finalDiagnosis}.{ext}
+- CSV contém: Image ID (nome do arquivo), Patient ID, Model Prediction, Doctor Final Diagnosis
+- Imagens são organizadas na pasta "dataset/" dentro do ZIP
+
+5.4. MÓDULO DE ARQUIVOS
+------------------------
+Endpoints:
+- GET /api/files/by-name/{filename} - Servir imagem por nome
+
+Funcionalidades:
+- Servir imagens armazenadas no sistema
+- Suporte a múltiplos formatos (JPG, PNG)
+- Detecção automática de tipo MIME
+- Acesso público (não requer autenticação)
+
+Regras:
+- Busca arquivo em múltiplos caminhos possíveis
+- Suporta caminhos relativos e absolutos
+- Retorna 404 se arquivo não encontrado
+
+================================================================================
+6. FLUXOS PRINCIPAIS
+================================================================================
+
+6.1. FLUXO DE CADASTRO E LOGIN
+-------------------------------
+1. Médico acessa tela de cadastro
+2. Preenche dados: nome, CPF, CRM, data de nascimento, email, senha
+3. Sistema valida dados e cria usuário com role MEDICO
+4. Médico faz login com email e senha
+5. Sistema retorna token JWT
+6. Token é armazenado no frontend (localStorage)
+7. Token é enviado em todas as requisições subsequentes
+
+6.2. FLUXO DE CRIAÇÃO DE CONSULTA
+----------------------------------
+1. Médico acessa dashboard e clica em "Nova Consulta"
+2. Preenche dados do paciente: nome, CPF, sexo, data de nascimento
+3. Seleciona uma ou mais imagens (até 10)
+4. Sistema busca paciente existente por CPF
+   - Se existe: atualiza dados se necessário
+   - Se não existe: cria novo paciente
+5. Sistema cria registro de consulta
+6. Para cada imagem:
+   a. Salva arquivo no disco (uploads/)
+   b. Envia imagem para microsserviço Python
+   c. Recebe diagnóstico da IA
+   d. Cria registro de Image com diagnóstico da IA
+7. Diagnóstico da consulta é baseado na primeira imagem
+8. Retorna consulta criada com todas as imagens e diagnósticos
+
+6.3. FLUXO DE CONFIRMAÇÃO DE DIAGNÓSTICO
+-----------------------------------------
+1. Médico visualiza lista de consultas
+2. Clica em "Mais Informações" em uma consulta
+3. Modal abre mostrando todas as imagens da consulta
+4. Para cada imagem:
+   a. Visualiza diagnóstico da IA (se disponível)
+   b. Seleciona diagnóstico final no dropdown
+   c. Clica em "Confirmar"
+5. Sistema atualiza imagem com finalDiagnosis e confirmed=true
+6. Modal é atualizado mostrando status confirmado
+
+6.4. FLUXO DE GERAÇÃO DE BACKUP
+---------------------------------
+1. Administrador acessa dashboard administrativo
+2. Clica em "Download Database"
+3. Sistema busca todas as imagens confirmadas
+4. Para cada imagem confirmada:
+   a. Verifica se arquivo existe no disco
+   b. Renomeia arquivo: {imageId}_{patientId}_{finalDiagnosis}.{ext}
+   c. Adiciona à pasta "dataset/" no ZIP
+   d. Adiciona linha no CSV com metadados
+5. Adiciona arquivo CSV ao ZIP
+6. Retorna arquivo ZIP para download
+
+================================================================================
+7. REGRAS DE NEGÓCIO
+================================================================================
+
+7.1. AUTENTICAÇÃO E AUTORIZAÇÃO
+--------------------------------
+- Todos os endpoints (exceto /api/auth/** e /api/files/**) requerem autenticação
+- Token JWT deve ser válido e não expirado
+- Médicos só podem acessar suas próprias consultas
+- Administradores podem acessar todas as funcionalidades
+- Validação de role ocorre em cada endpoint
+
+7.2. GESTÃO DE PACIENTES
+-------------------------
+- CPF é obrigatório e deve ser único
+- Sistema busca paciente existente por CPF antes de criar
+- Se paciente existe, atualiza nome e data de nascimento se fornecidos
+- Não permite duplicação de pacientes por CPF
+
+7.3. GESTÃO DE CONSULTAS
+-------------------------
+- Médico só pode criar consultas para si mesmo
+- Médico só pode ver suas próprias consultas
+- Uma consulta pode ter múltiplas imagens (até 10)
+- Cada imagem é analisada individualmente pela IA
+- Diagnóstico da consulta é baseado na primeira imagem processada
+- Consultas podem ser filtradas por nome ou CPF do paciente
+
+7.4. GESTÃO DE IMAGENS
+-----------------------
+- Cada imagem é processada pela IA individualmente
+- Diagnóstico da IA é armazenado por imagem
+- Médico pode confirmar diagnóstico de cada imagem separadamente
+- Apenas imagens confirmadas aparecem no backup
+- Imagens são armazenadas em uploads/ (local) ou /app/uploads (Docker)
+- Nomes de arquivo são gerados com UUID para evitar conflitos
+
+7.5. DIAGNÓSTICOS
+------------------
+- Diagnóstico da IA é sempre gerado quando imagem é enviada
+- Médico pode aceitar ou alterar diagnóstico da IA
+- Diagnóstico final deve ser um valor válido do enum Diagnosis
+- Confirmação é feita por imagem, não por consulta
+- Backup inclui apenas imagens com diagnóstico confirmado
+
+7.6. BACKUP E EXPORTAÇÃO
+-------------------------
+- Apenas administradores podem gerar backup
+- Backup inclui apenas imagens confirmadas
+- Imagens são renomeadas no backup para facilitar identificação
+- CSV contém metadados de todas as imagens confirmadas
+- Estrutura do ZIP: dataset/ (imagens) + database.csv
+
+================================================================================
+8. INTEGRAÇÃO COM MICROSSERVIÇO DE IA
+================================================================================
+
+8.1. ENDPOINT PYTHON
+---------------------
+URL: http://localhost:8081/predict (ou http://python-api:8081 no Docker)
+Método: POST
+Content-Type: multipart/form-data
+Body: file (MultipartFile)
+
+8.2. RESPOSTA ESPERADA
+-----------------------
+Formato JSON:
+{
+  "predictions": [{
+    "class" ou "Class": "Normal" ou "Anormal",
+    "Probabilidade": 0.8765,
+    "MultClass": "aom" (se anormal),
+    "ProbabilidadeMultClass": 0.8234 (se anormal)
+  }]
+}
+
+8.3. TRATAMENTO DE INCONSISTÊNCIAS
+------------------------------------
+O microsserviço Python retorna JSON inconsistente:
+- "Normal": usa "class" (minúsculo)
+- "Anormal": usa "Class" (maiúsculo)
+
+Solução: DTO com ambos os campos e método getClassValue() que retorna o não-nulo.
+
+8.4. TRATAMENTO DE ERROS
+-------------------------
+- Timeout de 60 segundos
+- Tratamento de erros 4xx e 5xx
+- Mensagens de erro descritivas
+- Fallback quando serviço não está disponível
+
+================================================================================
+9. SEGURANÇA
+================================================================================
+
+9.1. AUTENTICAÇÃO JWT
+---------------------
+- Algoritmo: HS512
+- Expiração: 24 horas (86400000ms)
+- Secret: Configurado em application.properties
+- Validação: Automática via JwtAuthenticationFilter
+
+9.2. AUTORIZAÇÃO RBAC
+----------------------
+- Roles: ADMIN, MEDICO
+- Validação por endpoint
+- Médicos: acesso apenas a suas consultas
+- Administradores: acesso total
+
+9.3. PROTEÇÃO DE DADOS
+-----------------------
+- Senhas armazenadas com hash BCrypt
+- Tokens JWT não contêm informações sensíveis
+- Validação de entrada em todos os endpoints
+- Sanitização de nomes de arquivo
+
+9.4. ENDPOINTS PÚBLICOS
+------------------------
+- /api/auth/** (cadastro e login)
+- /api/files/** (servir imagens)
+- /swagger-ui/** (documentação)
+- /v3/api-docs/** (OpenAPI)
+
+9.5. ENDPOINTS PROTEGIDOS
+-------------------------
+- /api/medico/** (requer role MEDICO ou ADMIN)
+- /api/admin/** (requer role ADMIN)
+
+================================================================================
+10. CONFIGURAÇÕES
+================================================================================
+
+10.1. APPLICATION.PROPERTIES (Desenvolvimento)
+------------------------------------------------
+- Porta: 8080
+- Banco: MySQL localhost:3306/ptmd_db
+- Upload: uploads/ (diretório relativo)
+- IA: http://localhost:8081
+- JWT Secret: Configurado
+- JWT Expiration: 86400000ms
+
+10.2. APPLICATION-DOCKER.PROPERTIES (Produção)
+------------------------------------------------
+- Porta: 8080
+- Banco: mysql:3306/ptmd_db (nome do serviço Docker)
+- Upload: /app/uploads (diretório absoluto)
+- IA: http://python-api:8081 (nome do serviço Docker)
+- JWT Secret: Configurado
+- JWT Expiration: 86400000ms
+
+10.3. CREDENCIAIS PADRÃO
+--------------------------
+Admin:
+- Email: admin
+- Senha: admin
+- Nome: Administrador Principal
+
+Médico (Mock):
+- Email: medico@example.com
+- Senha: password
+- Nome: Dr. Mock Teste
+- CPF: 123.456.789-00
+- CRM: CRM/SP 123456
+
+10.4. LIMITES E RESTRIÇÕES
+----------------------------
+- Tamanho máximo de arquivo: 10MB
+- Tamanho máximo de requisição: 10MB
+- Máximo de imagens por consulta: 10
+- Timeout de requisição à IA: 60 segundos
+- Tamanho máximo de memória para imagens: 10MB
+
+================================================================================
+11. ESTRUTURA DE DIRETÓRIOS
+================================================================================
+
+11.1. BACKEND
+--------------
+PTMD-BACK/
+├── src/main/java/com/ptmd/
+│   ├── controller/ (REST Controllers)
+│   ├── service/ (Lógica de negócio)
+│   ├── repository/ (Acesso a dados)
+│   ├── entity/ (Entidades JPA)
+│   ├── dto/ (Data Transfer Objects)
+│   ├── security/ (Configuração de segurança)
+│   └── exception/ (Tratamento de exceções)
+├── src/main/resources/
+│   ├── application.properties
+│   └── application-docker.properties
+└── uploads/ (imagens armazenadas)
+
+11.2. FRONTEND
+--------------
+PTMD-FRONT/
+├── src/
+│   ├── pages/ (Componentes de página)
+│   ├── components/ (Componentes reutilizáveis)
+│   ├── services/ (Serviços de API)
+│   ├── types/ (Tipos TypeScript)
+│   └── utils/ (Utilitários)
+└── public/ (Arquivos estáticos)
+
+================================================================================
+12. DOCUMENTAÇÃO DA API
+================================================================================
+
+12.1. SWAGGER/OPENAPI
+---------------------
+- URL: http://localhost:8080/swagger-ui.html
+- Documentação interativa de todos os endpoints
+- Teste de endpoints diretamente no navegador
+- Autenticação JWT integrada (botão "Authorize")
+- Exemplos de requisições e respostas
+
+12.2. ENDPOINTS PRINCIPAIS
+---------------------------
+Autenticação:
+- POST /api/auth/register
+- POST /api/auth/login
+
+Médico:
+- POST /api/medico/consultations
+- GET /api/medico/consultations
+- GET /api/medico/consultations/{id}
+- PUT /api/medico/consultations/images/{imageId}/confirm
+
+Administrador:
+- GET /api/admin/dashboard
+- POST /api/admin/change-password
+- GET /api/admin/backup
+
+Arquivos:
+- GET /api/files/by-name/{filename}
+
+================================================================================
+13. DEPLOYMENT E DOCKER
+================================================================================
+
+13.1. DOCKER COMPOSE
+---------------------
+Serviços:
+- java-backend: Aplicação Spring Boot
+- mysql: Banco de dados MySQL
+- python-api: Microsserviço de IA
+- frontend: Aplicação React
+
+13.2. VARIÁVEIS DE AMBIENTE
+----------------------------
+Todas as configurações estão em application.properties
+Não há variáveis de ambiente no docker-compose.yml
+
+13.3. VOLUMES
+-------------
+- MySQL: Persistência de dados
+- Backend: Diretório de uploads (/app/uploads)
+
+================================================================================
+14. VALIDAÇÕES E REGRAS DE VALIDAÇÃO
+================================================================================
+
+14.1. CADASTRO DE MÉDICO
+-------------------------
+- Nome: obrigatório
+- Email: obrigatório, formato válido, único
+- Senha: obrigatória, mínimo 6 caracteres
+- CPF: opcional, formato válido
+- CRM: opcional
+- Data de nascimento: opcional, formato válido
+
+14.2. CRIAÇÃO DE CONSULTA
+--------------------------
+- Nome do paciente: obrigatório
+- CPF do paciente: obrigatório, único
+- Sexo: obrigatório (MASCULINO, FEMININO, OUTRO)
+- Data de nascimento: opcional
+- Imagens: obrigatório, pelo menos 1, máximo 10
+- Formato de imagem: JPG, JPEG, PNG
+
+14.3. CONFIRMAÇÃO DE DIAGNÓSTICO
+----------------------------------
+- Diagnóstico final: obrigatório
+- Deve ser um valor válido do enum Diagnosis
+- Imagem deve existir e pertencer ao médico
+
+================================================================================
+15. TRATAMENTO DE ERROS
+================================================================================
+
+15.1. EXCEÇÕES GLOBAIS
+-----------------------
+GlobalExceptionHandler trata:
+- MethodArgumentNotValidException: Validações de Bean Validation
+- IllegalArgumentException: Valores inválidos (ex: enum)
+- RuntimeException: Erros de negócio
+- Exception: Erros genéricos
+
+15.2. CÓDIGOS HTTP
+-------------------
+- 200: Sucesso
+- 201: Criado com sucesso
+- 400: Bad Request (dados inválidos)
+- 401: Unauthorized (token inválido ou ausente)
+- 403: Forbidden (sem permissão)
+- 404: Not Found (recurso não encontrado)
+- 500: Internal Server Error (erro interno)
+
+================================================================================
+16. MELHORIAS E FUNCIONALIDADES FUTURAS
+================================================================================
+
+Funcionalidades implementadas recentemente:
+- Suporte a múltiplas imagens por consulta
+- Diagnóstico individual por imagem
+- Filtros de busca por nome e CPF
+- Modal de detalhes da consulta
+- Backup com estrutura organizada (pasta dataset)
+- CSV com metadados no backup
+
+Possíveis melhorias futuras:
+- Histórico de alterações de diagnóstico
+- Relatórios estatísticos avançados
+- Exportação de dados em outros formatos
+- Notificações em tempo real
+- Integração com outros sistemas
+- Dashboard com gráficos e métricas
+
+================================================================================
+17. REPOSITÓRIO E VERSIONAMENTO
+================================================================================
+
+17.1. REPOSITÓRIO GITHUB
+-------------------------
+URL: https://github.com/JairAssisDev/ptmd.git
+Autor: JairAssisDev
+Branch Principal: master
+
+17.2. ESTRUTURA DO REPOSITÓRIO
+-------------------------------
+O repositório contém os seguintes módulos principais:
+- PTMD-BACK/ - Backend Java Spring Boot
+- PTMD-FRONT/ - Frontend React TypeScript
+- PTMD-BACK-IA/ - Microsserviço Python de IA
+
+17.3. DISTRIBUIÇÃO DE LINGUAGENS
+---------------------------------
+Conforme análise do repositório:
+- Java: 53.1%
+- TypeScript: 35.5%
+- Kotlin: 9.3%
+- Dockerfile: 1.0%
+- JavaScript: 0.4%
+- HTML: 0.4%
+- CSS: 0.3%
+
+17.4. CLONAGEM DO REPOSITÓRIO
+------------------------------
+Para clonar o repositório:
+
+```bash
+git clone https://github.com/JairAssisDev/ptmd.git
+cd ptmd
+```
+
+17.5. ESTRUTURA DE COMMITS
+---------------------------
+O repositório possui histórico de commits documentando:
+- Implementação inicial do sistema
+- Adição de funcionalidades
+- Correções e melhorias
+- Configurações de Docker
+- Integrações com IA
+
+17.6. COLABORAÇÃO
+-----------------
+Para contribuir com o projeto:
+1. Fazer fork do repositório
+2. Criar branch para nova funcionalidade
+3. Fazer commit das alterações
+4. Abrir Pull Request para revisão
+
+================================================================================
+18. CONSIDERAÇÕES FINAIS
+================================================================================
+
+O sistema PTMD é uma solução completa para diagnóstico médico assistido por IA,
+com foco em:
+- Usabilidade: Interface intuitiva e responsiva
+- Segurança: Autenticação e autorização robustas
+- Escalabilidade: Arquitetura preparada para crescimento
+- Manutenibilidade: Código organizado e documentado
+- Confiabilidade: Tratamento de erros e validações
+
+O sistema está pronto para uso em ambiente de produção, com todas as
+funcionalidades principais implementadas e testadas.
+
+O código-fonte está disponível publicamente no GitHub, permitindo:
+- Transparência no desenvolvimento
+- Colaboração da comunidade
+- Versionamento e controle de mudanças
+- Facilidade de deploy e distribuição
+
+================================================================================
+FIM DO RELATÓRIO
+================================================================================
+
+

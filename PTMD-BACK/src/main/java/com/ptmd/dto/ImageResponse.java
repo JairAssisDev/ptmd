@@ -5,21 +5,22 @@ import lombok.Data;
 import lombok.NoArgsConstructor;
 
 import java.time.LocalDateTime;
-import java.util.List;
 
 @Data
 @NoArgsConstructor
 @AllArgsConstructor
-public class ConsultationResponse {
+public class ImageResponse {
     private Long id;
-    private PatientResponse patient;
+    private String fileName;
+    private String filePath;
+    private Long fileSize;
+    private String contentType;
     private String aiDiagnosis;
     private Double confidence;
     private String multClass;
     private Double multClassConfidence;
     private String finalDiagnosis;
     private Boolean confirmed;
-    private List<ImageResponse> images;
     private LocalDateTime createdAt;
 }
 

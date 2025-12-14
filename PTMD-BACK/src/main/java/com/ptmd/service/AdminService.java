@@ -97,15 +97,15 @@ public class AdminService {
                     continue; // Pular se o arquivo não existir
                 }
 
-                // Obter informações da consulta e paciente
-                Long imageId = image.getId();
+                // Obter informações da imagem, consulta e paciente
+                String imageFileName = image.getFileName() != null ? image.getFileName() : "unknown";
                 Long patientId = image.getConsultation().getPatient().getId();
-                String aiDiagnosis = image.getConsultation().getAiDiagnosis();
-                String finalDiagnosis = image.getConsultation().getFinalDiagnosis();
+                String aiDiagnosis = image.getAiDiagnosis();
+                String finalDiagnosis = image.getFinalDiagnosis();
                 
-                // Escrever linha no CSV
-                csvWriter.printf("%d,%d,%s,%s%n", 
-                    imageId, 
+                // Escrever linha no CSV usando o nome da imagem
+                csvWriter.printf("%s,%d,%s,%s%n", 
+                    imageFileName, 
                     patientId, 
                     aiDiagnosis != null ? aiDiagnosis : "", 
                     finalDiagnosis != null ? finalDiagnosis : "");
@@ -134,10 +134,11 @@ public class AdminService {
                 }
                 
                 // Criar nome do arquivo: {imageId}_{patientId}_{finalDiagnosis}.{ext}
-                String newFileName = String.format("%d_%d_%s%s", imageId, patientId, safeDiagnosis, extension);
+                String newFileName = String.format("%d_%d_%s%s", image.getId(), patientId, safeDiagnosis, extension);
                 
-                // Adicionar arquivo ao ZIP com o novo nome
-                addFileToZip(imagePath.toFile(), newFileName, zos);
+                // Adicionar arquivo ao ZIP dentro da pasta "dataset"
+                String zipEntryPath = "dataset/" + newFileName;
+                addFileToZip(imagePath.toFile(), zipEntryPath, zos);
             }
             
             csvWriter.flush();
