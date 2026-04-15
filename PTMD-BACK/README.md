@@ -1,169 +1,461 @@
-# PTMD Backend API
+# 🏥 PTMD Backend API
 
-API Principal (Backend) para o sistema de diagnóstico médico "PTMD-YOLO" desenvolvida em Java Spring Boot 3.
+> API Principal (Backend) para o sistema de diagnóstico médico **PTMD-YOLO**, desenvolvida em **Java Spring Boot 3**.
 
-## Tecnologias
+---
 
-- **Java 17+**
-- **Spring Boot 3.2.0**
-- **Spring Security** com JWT para autenticação
-- **MySQL** (JPA/Hibernate)
-- **Lombok** para redução de código
-- **WebClient** para integração com microsserviço Python
-- **SpringDoc OpenAPI** para documentação Swagger
+## 📋 Índice
 
-## Pré-requisitos
+- [Visão Geral](#-visão-geral)
+- [Tecnologias](#-tecnologias)
+- [Pré-requisitos](#-pré-requisitos)
+- [Guia de Instalação](#-guia-de-instalação)
+  - [Instalação Local](#opção-1--instalação-local)
+  - [Instalação com Docker](#opção-2--instalação-com-docker)
+- [Configuração](#-configuração)
+- [Executando a Aplicação](#-executando-a-aplicação)
+- [Documentação Swagger/OpenAPI](#-documentação-swaggeropenapi)
+- [Estrutura do Projeto](#-estrutura-do-projeto)
+- [Endpoints da API](#-endpoints-da-api)
+- [Fluxo de Consulta](#-fluxo-de-consulta)
+- [Segurança](#-segurança)
+- [Credenciais Padrão](#-credenciais-padrão)
+- [Troubleshooting](#-troubleshooting)
 
-- Java 17 ou superior
-- Maven 3.6+
-- MySQL 8.0+
-- Microsserviço Python rodando em `http://localhost:8081`
+---
 
-## Configuração
+## 🔍 Visão Geral
 
-### 1. Banco de Dados
+O PTMD Backend é a API REST central do sistema de diagnóstico médico assistido por IA. Ele gerencia:
 
-Crie um banco de dados MySQL ou configure as credenciais no arquivo `application.properties`:
+- **Autenticação e autorização** via JWT (RBAC: ADMIN / MEDICO)
+- **Cadastro de pacientes** e criação de consultas médicas
+- **Upload e processamento de imagens** de exames otológicos
+- **Integração com microsserviço de IA** (Python) para diagnóstico automático
+- **Confirmação de diagnósticos** individualmente por imagem
+- **Backup de dados** com exportação em ZIP (imagens + CSV de metadados)
 
-```properties
-spring.datasource.url=jdbc:mysql://localhost:3306/ptmd_db?createDatabaseIfNotExist=true
-spring.datasource.username=root
-spring.datasource.password=sua_senha
+---
+
+## 🛠 Tecnologias
+
+| Tecnologia | Versão | Descrição |
+|---|---|---|
+| **Java** | 17+ | Linguagem principal |
+| **Spring Boot** | 3.2.0 | Framework web |
+| **Spring Security** | — | Autenticação JWT |
+| **MySQL** | 8.0+ | Banco de dados relacional |
+| **JPA / Hibernate** | — | ORM para persistência |
+| **Lombok** | — | Redução de boilerplate |
+| **WebClient** | — | Integração reativa com microsserviço Python |
+| **SpringDoc OpenAPI** | 2.3.0 | Documentação Swagger |
+| **Maven** | 3.6+ | Gerenciador de build/dependências |
+| **Docker** | — | Containerização |
+
+---
+
+## ✅ Pré-requisitos
+
+### Para instalação local
+
+- [Java JDK 17+](https://adoptium.net/) instalado e configurado no `PATH`
+- [Maven 3.6+](https://maven.apache.org/download.cgi) instalado e configurado no `PATH`
+- [MySQL 8.0+](https://dev.mysql.com/downloads/installer/) instalado e rodando
+- Microsserviço Python (PTMD-BACK-IA) rodando em `http://localhost:8081`
+
+### Para instalação com Docker
+
+- [Docker Desktop](https://www.docker.com/products/docker-desktop/) instalado e rodando
+
+### Verificando os pré-requisitos
+
+```bash
+# Verificar Java
+java -version
+# Esperado: openjdk version "17.x.x" ou superior
+
+# Verificar Maven
+mvn -version
+# Esperado: Apache Maven 3.6.x ou superior
+
+# Verificar MySQL
+mysql --version
+# Esperado: mysql Ver 8.x.x
+
+# Verificar Docker (se usar Docker)
+docker --version
+docker compose version
 ```
 
-### 2. Diretório de Uploads
+---
 
-O sistema criará automaticamente a pasta `uploads` na raiz do projeto para armazenar as imagens.
+## 🚀 Guia de Instalação
 
-### 3. Microsserviço Python
+### Opção 1 — Instalação Local
 
-Certifique-se de que o microsserviço Python está rodando em `http://localhost:8081`.
+#### Passo 1: Clonar o repositório
 
-## Executando a Aplicação
+```bash
+git clone https://github.com/JairAssisDev/ptmd.git
+cd ptmd/PTMD-BACK
+```
+
+#### Passo 2: Configurar o banco de dados MySQL
+
+Conecte-se ao MySQL e crie o banco:
+
+```sql
+CREATE DATABASE IF NOT EXISTS ptmd_db
+  CHARACTER SET utf8mb4
+  COLLATE utf8mb4_unicode_ci;
+```
+
+> 💡 **Nota:** O Spring Boot JPA criará as tabelas automaticamente na primeira execução. Usuários padrão (admin e médico mock) também são criados pela aplicação.
+
+#### Passo 3: Configurar o `application.properties`
+
+Edite o arquivo `src/main/resources/application.properties` com as credenciais do seu MySQL:
+
+```properties
+# Conexão com o banco
+spring.datasource.url=jdbc:mysql://localhost:3306/ptmd_db?createDatabaseIfNotExist=true
+spring.datasource.username=root
+spring.datasource.password=sua_senha_aqui
+
+# URL do microsserviço de IA
+python.api.url=http://localhost:8081
+
+# Diretório de uploads (será criado automaticamente)
+file.upload-dir=uploads
+```
+
+#### Passo 4: Instalar dependências e compilar
+
+```bash
+mvn clean install -DskipTests
+```
+
+#### Passo 5: Executar a aplicação
 
 ```bash
 mvn spring-boot:run
 ```
 
-A API estará disponível em `http://localhost:8080`
+✅ **A API estará disponível em:** `http://localhost:8080`
+
+---
+
+### Opção 2 — Instalação com Docker
+
+#### Passo 1: Clonar o repositório
+
+```bash
+git clone https://github.com/JairAssisDev/ptmd.git
+cd ptmd/PTMD-BACK
+```
+
+#### Passo 2: Subir os containers (Backend + MySQL)
+
+```bash
+docker compose up --build -d
+```
+
+Isso irá criar e iniciar:
+
+| Container | Porta | Descrição |
+|---|---|---|
+| `ptmd-mysql` | `3306` | Banco de dados MySQL 8.0 |
+| `ptmd-backend` | `8080` | API Spring Boot |
+
+#### Passo 3: Verificar se os containers estão rodando
+
+```bash
+docker compose ps
+```
+
+#### Passo 4: Acompanhar os logs
+
+```bash
+# Logs do backend
+docker logs -f ptmd-backend
+
+# Logs do MySQL
+docker logs -f ptmd-mysql
+```
+
+✅ **A API estará disponível em:** `http://localhost:8080`
+
+#### Credenciais do MySQL no Docker
+
+| Variável | Valor |
+|---|---|
+| `MYSQL_ROOT_PASSWORD` | `root_password` |
+| `MYSQL_DATABASE` | `ptmd_db` |
+| `MYSQL_USER` | `ptmd_user` |
+| `MYSQL_PASSWORD` | `ptmd_password` |
+
+#### Parar os containers
+
+```bash
+docker compose down
+
+# Para remover também os volumes (dados do banco):
+docker compose down -v
+```
+
+---
+
+## ⚙ Configuração
+
+### Variáveis de configuração importantes
+
+| Propriedade | Descrição | Padrão (Local) | Padrão (Docker) |
+|---|---|---|---|
+| `spring.datasource.url` | URL do banco MySQL | `localhost:3306/ptmd_db` | `mysql:3306/ptmd_db` |
+| `python.api.url` | URL do microsserviço de IA | `http://localhost:8081` | `http://python-api:8081` |
+| `file.upload-dir` | Diretório de uploads | `uploads` | `/app/uploads` |
+| `jwt.expiration` | Tempo de expiração do token | `86400000` (24h) | `86400000` (24h) |
+
+### Limites do sistema
+
+- **Tamanho máximo por arquivo:** 10 MB
+- **Tamanho máximo por requisição:** 10 MB
+- **Máximo de imagens por consulta:** 10
+- **Timeout de requisição à IA:** 60 segundos
+
+---
+
+## ▶ Executando a Aplicação
+
+### Modo Desenvolvimento (Local)
+
+```bash
+mvn spring-boot:run
+```
+
+### Modo Produção (Docker)
+
+```bash
+docker compose up --build -d
+```
+
+### Diretório de Uploads
+
+O sistema criará automaticamente a pasta `uploads/` na raiz do projeto (local) ou `/app/uploads` (Docker) para armazenar as imagens enviadas.
+
+---
 
 ## 📚 Documentação Swagger/OpenAPI
 
-A API possui documentação interativa via Swagger UI. Após iniciar a aplicação, acesse:
+Após iniciar a aplicação, acesse a documentação interativa:
 
-**Swagger UI:** `http://localhost:8080/swagger-ui.html`
-
-**OpenAPI JSON:** `http://localhost:8080/v3/api-docs`
-
-### Funcionalidades do Swagger
-
-- ✅ Documentação completa de todos os endpoints
-- ✅ Teste interativo de endpoints diretamente no navegador
-- ✅ Autenticação JWT integrada (botão "Authorize")
-- ✅ Exemplos de requisições e respostas
-- ✅ Validação de schemas
-- ✅ Organização por tags (Autenticação, Consultas Médicas, Administração)
+| Recurso | URL |
+|---|---|
+| **Swagger UI** | `http://localhost:8080/swagger-ui.html` |
+| **OpenAPI JSON** | `http://localhost:8080/v3/api-docs` |
 
 ### Como usar o Swagger
 
 1. Acesse `http://localhost:8080/swagger-ui.html`
 2. Para testar endpoints protegidos:
-   - Primeiro, faça login em `/api/auth/login`
-   - Copie o token retornado
+   - Faça login em `POST /api/auth/login`
+   - Copie o token JWT retornado
    - Clique no botão **"Authorize"** no topo da página
    - Cole o token no formato: `Bearer {seu_token}`
    - Agora você pode testar todos os endpoints protegidos
 
-## Estrutura de Usuários
+### Funcionalidades do Swagger
 
-### Administrador (ADMIN)
+- ✅ Documentação completa de todos os endpoints
+- ✅ Teste interativo diretamente no navegador
+- ✅ Autenticação JWT integrada
+- ✅ Exemplos de requisições e respostas
+- ✅ Validação de schemas
+- ✅ Organização por tags
 
-**Credenciais padrão:**
-- Email: `admin`
-- Senha: `admin`
+---
 
-**Funcionalidades:**
-- Dashboard com estatísticas
-- Backup de imagens (download ZIP)
-- Alterar senha própria
-
-### Médico (MEDICO)
-
-**Cadastro:**
-- Rota pública: `POST /api/auth/register`
-- Dados necessários: Nome, CPF, CRM, Data de Nascimento, Email, Senha
-
-**Funcionalidades:**
-- Login e autenticação JWT
-- Criar consultas com pacientes
-- Confirmar diagnóstico da IA
-- Visualizar histórico de consultas
-
-## Endpoints Principais
-
-### Autenticação
-
-- `POST /api/auth/register` - Cadastro de médico (público)
-- `POST /api/auth/login` - Login (público)
-
-### Médico
-
-- `POST /api/medico/consultations` - Criar consulta (com upload de imagem)
-- `PUT /api/medico/consultations/{id}/confirm` - Confirmar diagnóstico
-- `GET /api/medico/consultations` - Listar minhas consultas
-
-### Admin
-
-- `GET /api/admin/dashboard` - Dashboard com estatísticas
-- `POST /api/admin/change-password` - Alterar senha
-- `GET /api/admin/backup` - Download backup de imagens (ZIP)
-
-## Fluxo de Consulta
-
-1. **Médico cria consulta:**
-   - Envia dados do paciente e imagem da lesão
-   - API salva imagem em disco
-   - API envia imagem para microsserviço Python
-   - Python retorna diagnóstico da IA
-   - API salva resultado preliminar
-
-2. **Médico confirma diagnóstico:**
-   - Médico pode aceitar diagnóstico da IA ou escolher outro
-   - API salva diagnóstico final validado
-
-## Integração com IA
-
-A API integra com o microsserviço Python através de `WebClient`:
-
-- **Endpoint Python:** `POST http://localhost:8081/predict`
-- **Formato:** MultipartFile (imagem)
-- **Resposta:** JSON com predições (trata inconsistência "class"/"Class")
-
-## Estrutura do Projeto
+## 📁 Estrutura do Projeto
 
 ```
-src/main/java/com/ptmd/
-├── config/          # Configurações (DataInitializer)
-├── controller/      # Controladores REST
-├── dto/            # Data Transfer Objects
-├── entity/         # Entidades JPA
-├── exception/      # Handlers de exceção
-├── repository/     # Repositórios JPA
-├── security/       # Configuração de segurança e JWT
-└── service/        # Lógica de negócio
+PTMD-BACK/
+├── src/main/java/com/ptmd/
+│   ├── config/          # Configurações (DataInitializer)
+│   ├── controller/      # Controladores REST
+│   ├── dto/             # Data Transfer Objects
+│   ├── entity/          # Entidades JPA
+│   ├── exception/       # Handlers de exceção globais
+│   ├── repository/      # Repositórios JPA
+│   ├── security/        # Configuração de segurança e JWT
+│   └── service/         # Lógica de negócio
+├── src/main/resources/
+│   ├── application.properties          # Config desenvolvimento
+│   └── application-docker.properties   # Config Docker/produção
+├── Dockerfile           # Build multi-stage do container
+├── docker-compose.yml   # Orquestração Backend + MySQL
+├── init.sql             # Script de inicialização do banco
+├── pom.xml              # Dependências Maven
+└── uploads/             # Imagens armazenadas (gerado em runtime)
 ```
 
-## Segurança
+---
 
-- Autenticação via JWT
-- RBAC (Role-Based Access Control)
-- Senhas hashadas com BCrypt
-- Proteção CSRF desabilitada (API stateless)
+## 🔗 Endpoints da API
 
-## Observações
+### 🔓 Autenticação (público)
 
-- As imagens são armazenadas localmente na pasta `uploads/`
-- O caminho das imagens é salvo no banco de dados
-- O usuário admin é criado automaticamente na primeira execução
-- O sistema trata a inconsistência do JSON do Python ("class" vs "Class")
+| Método | Endpoint | Descrição |
+|---|---|---|
+| `POST` | `/api/auth/register` | Cadastro público de médico |
+| `POST` | `/api/auth/login` | Login e obtenção de token JWT |
 
+### 🩺 Médico (requer `MEDICO` ou `ADMIN`)
+
+| Método | Endpoint | Descrição |
+|---|---|---|
+| `POST` | `/api/medico/consultations` | Criar nova consulta (com upload de imagens) |
+| `GET` | `/api/medico/consultations` | Listar consultas do médico (filtros: nome, CPF) |
+| `GET` | `/api/medico/consultations/{id}` | Obter detalhes de uma consulta |
+| `PUT` | `/api/medico/consultations/{id}/confirm` | Confirmar diagnóstico da consulta (legado) |
+| `PUT` | `/api/medico/consultations/images/{imageId}/confirm` | Confirmar diagnóstico por imagem |
+
+### 🔧 Administração (requer `ADMIN`)
+
+| Método | Endpoint | Descrição |
+|---|---|---|
+| `GET` | `/api/admin/dashboard` | Estatísticas do sistema |
+| `POST` | `/api/admin/change-password` | Alterar senha do administrador |
+| `GET` | `/api/admin/backup` | Download do backup (ZIP com imagens + CSV) |
+
+### 📁 Arquivos (público)
+
+| Método | Endpoint | Descrição |
+|---|---|---|
+| `GET` | `/api/files/by-name/{filename}` | Servir imagem por nome do arquivo |
+
+---
+
+## 🔄 Fluxo de Consulta
+
+```
+1. Médico cria consulta
+   ├── Envia dados do paciente + imagens
+   ├── API busca/cria paciente por CPF
+   └── Para cada imagem:
+       ├── Salva no disco (uploads/)
+       ├── Envia para microsserviço Python (POST /predict)
+       ├── Recebe diagnóstico da IA (Normal / Anormal + classe)
+       └── Salva resultado na entidade Image
+
+2. Médico confirma diagnóstico
+   ├── Visualiza cada imagem com diagnóstico da IA
+   ├── Seleciona diagnóstico final
+   └── API marca imagem como confirmada
+```
+
+### Diagnósticos possíveis
+
+| Valor | Descrição |
+|---|---|
+| `Normal` | Ouvido normal |
+| `aom` | Otite Média Aguda |
+| `csom` | Otite Média Crônica |
+| `earwax` | Cerúmen |
+| `ExternalEarInfections` | Infecções do Ouvido Externo |
+| `tympanoskleros` | Timpanoesclerose |
+
+---
+
+## 🔐 Segurança
+
+- **Autenticação:** JWT (HS512) com expiração de 24 horas
+- **Autorização:** RBAC (Role-Based Access Control) com roles `ADMIN` e `MEDICO`
+- **Senhas:** Hashadas com BCrypt
+- **CSRF:** Desabilitado (API stateless)
+- **CORS:** Configurado para permitir requests do frontend
+
+### Endpoints públicos (sem autenticação)
+
+- `/api/auth/**` — Cadastro e login
+- `/api/files/**` — Servir imagens
+- `/swagger-ui/**` — Documentação
+- `/v3/api-docs/**` — OpenAPI spec
+
+---
+
+## 🔑 Credenciais Padrão
+
+### Administrador
+
+| Campo | Valor |
+|---|---|
+| **Email** | `admin` |
+| **Senha** | `admin` |
+
+### Médico (Mock)
+
+| Campo | Valor |
+|---|---|
+| **Email** | `medico@example.com` |
+| **Senha** | `password` |
+| **CPF** | `123.456.789-00` |
+| **CRM** | `CRM/SP 123456` |
+
+> ⚠️ **Importante:** Estes usuários são criados automaticamente pelo `DataInitializer` na primeira execução. Altere as senhas padrão em ambiente de produção.
+
+---
+
+## 🐛 Troubleshooting
+
+### Erro: Não conecta ao MySQL
+
+```
+Communications link failure
+```
+
+**Soluções:**
+1. Verifique se o MySQL está rodando: `mysql -u root -p`
+2. Confirme as credenciais em `application.properties`
+3. Verifique se o banco `ptmd_db` existe
+4. Confira se a porta `3306` está livre: `netstat -an | findstr 3306`
+
+### Erro: Não conecta ao microsserviço Python
+
+```
+Connection refused: localhost:8081
+```
+
+**Soluções:**
+1. Verifique se o PTMD-BACK-IA está rodando na porta `8081`
+2. Teste manualmente: `curl http://localhost:8081/predict`
+3. Se estiver usando Docker, verifique a URL: `http://python-api:8081`
+
+### Erro: Upload de imagem falha
+
+```
+Maximum upload size exceeded
+```
+
+**Soluções:**
+1. Verifique se a imagem tem menos de 10 MB
+2. Formatos aceitos: JPG, JPEG, PNG
+3. Verifique se a pasta `uploads/` tem permissão de escrita
+
+### Docker: Container não inicia
+
+```bash
+# Ver logs detalhados
+docker logs ptmd-backend
+
+# Recriar do zero
+docker compose down -v
+docker compose up --build -d
+```
+
+---
+
+## 📄 Licença
+
+Este projeto faz parte do sistema **PTMD-YOLO** — Sistema de Diagnóstico Médico com IA.
+
+**Repositório:** [https://github.com/JairAssisDev/ptmd](https://github.com/JairAssisDev/ptmd)
